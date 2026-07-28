@@ -1,0 +1,902 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.45.15.27210",
+      "templateHash": "14871593930867006867"
+    }
+  },
+  "parameters": {
+    "prefix": {
+      "type": "string",
+      "defaultValue": "trial"
+    },
+    "env": {
+      "type": "string",
+      "defaultValue": "dev"
+    },
+    "instance": {
+      "type": "string",
+      "defaultValue": "001"
+    },
+    "regionShort": {
+      "type": "string",
+      "defaultValue": "eus2"
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "eastus2"
+    },
+    "alertEmail": {
+      "type": "string"
+    },
+    "appServiceSku": {
+      "type": "string",
+      "defaultValue": "F1",
+      "allowedValues": [
+        "F1",
+        "B1"
+      ]
+    }
+  },
+  "variables": {
+    "rgName": "[format('rg-{0}-{1}-{2}-{3}', parameters('prefix'), parameters('env'), parameters('regionShort'), parameters('instance'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/resourceGroups",
+      "apiVersion": "2023-07-01",
+      "name": "[variables('rgName')]",
+      "location": "[parameters('location')]"
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('deploy-budget-{0}', parameters('regionShort'))]",
+      "location": "[deployment().location]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "prefix": {
+            "value": "[parameters('prefix')]"
+          },
+          "env": {
+            "value": "[parameters('env')]"
+          },
+          "instance": {
+            "value": "[parameters('instance')]"
+          },
+          "regionShort": {
+            "value": "[parameters('regionShort')]"
+          },
+          "contactEmails": {
+            "value": [
+              "[parameters('alertEmail')]"
+            ]
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.45.15.27210",
+              "templateHash": "2570199256279250026"
+            }
+          },
+          "parameters": {
+            "prefix": {
+              "type": "string"
+            },
+            "env": {
+              "type": "string"
+            },
+            "instance": {
+              "type": "string"
+            },
+            "regionShort": {
+              "type": "string"
+            },
+            "amount": {
+              "type": "int",
+              "defaultValue": 140
+            },
+            "contactEmails": {
+              "type": "array"
+            },
+            "startDate": {
+              "type": "string",
+              "defaultValue": "[format('{0}-01T00:00:00Z', utcNow('yyyy-MM'))]"
+            }
+          },
+          "variables": {
+            "budgetName": "[format('budget-{0}-{1}-{2}-{3}', parameters('prefix'), parameters('env'), parameters('regionShort'), parameters('instance'))]",
+            "endDate": "[dateTimeAdd(parameters('startDate'), 'P1Y')]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Consumption/budgets",
+              "apiVersion": "2023-05-01",
+              "name": "[variables('budgetName')]",
+              "properties": {
+                "category": "Cost",
+                "amount": "[parameters('amount')]",
+                "timeGrain": "Monthly",
+                "timePeriod": {
+                  "startDate": "[parameters('startDate')]",
+                  "endDate": "[variables('endDate')]"
+                },
+                "notifications": {
+                  "Alerta_50pct_Consumido": {
+                    "enabled": true,
+                    "operator": "GreaterThan",
+                    "threshold": 50,
+                    "contactEmails": "[parameters('contactEmails')]",
+                    "thresholdType": "Actual"
+                  },
+                  "Alerta_80pct_Consumido": {
+                    "enabled": true,
+                    "operator": "GreaterThan",
+                    "threshold": 80,
+                    "contactEmails": "[parameters('contactEmails')]",
+                    "thresholdType": "Actual"
+                  },
+                  "Alerta_100pct_Proyectado": {
+                    "enabled": true,
+                    "operator": "GreaterThan",
+                    "threshold": 100,
+                    "contactEmails": "[parameters('contactEmails')]",
+                    "thresholdType": "Forecasted"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "deploy-network",
+      "resourceGroup": "[variables('rgName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "prefix": {
+            "value": "[parameters('prefix')]"
+          },
+          "env": {
+            "value": "[parameters('env')]"
+          },
+          "instance": {
+            "value": "[parameters('instance')]"
+          },
+          "regionShort": {
+            "value": "[parameters('regionShort')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.45.15.27210",
+              "templateHash": "16269690782120206999"
+            }
+          },
+          "parameters": {
+            "prefix": {
+              "type": "string"
+            },
+            "env": {
+              "type": "string"
+            },
+            "instance": {
+              "type": "string"
+            },
+            "regionShort": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string",
+              "defaultValue": "[resourceGroup().location]"
+            }
+          },
+          "variables": {
+            "vnetName": "[format('vnet-{0}-{1}-{2}-{3}', parameters('prefix'), parameters('env'), parameters('regionShort'), parameters('instance'))]",
+            "vnetPrefix": "10.20.0.0/16",
+            "nsgAppName": "[format('nsg-{0}-{1}-{2}-{3}-app', parameters('prefix'), parameters('env'), parameters('regionShort'), parameters('instance'))]",
+            "nsgStorageName": "[format('nsg-{0}-{1}-{2}-{3}-st', parameters('prefix'), parameters('env'), parameters('regionShort'), parameters('instance'))]",
+            "nsgMgtName": "[format('nsg-{0}-{1}-{2}-{3}-mgt', parameters('prefix'), parameters('env'), parameters('regionShort'), parameters('instance'))]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Network/networkSecurityGroups",
+              "apiVersion": "2023-09-01",
+              "name": "[variables('nsgAppName')]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "securityRules": [
+                  {
+                    "name": "AllowManagementToAppService",
+                    "properties": {
+                      "priority": 100,
+                      "direction": "Inbound",
+                      "access": "Allow",
+                      "protocol": "Tcp",
+                      "sourceAddressPrefix": "10.20.5.0/24",
+                      "sourcePortRange": "*",
+                      "destinationAddressPrefix": "10.20.1.0/24",
+                      "destinationPortRange": "443",
+                      "description": "Administracion"
+                    }
+                  },
+                  {
+                    "name": "AllowAppServiceToStorageOutbound",
+                    "properties": {
+                      "priority": 100,
+                      "direction": "Outbound",
+                      "access": "Allow",
+                      "protocol": "Tcp",
+                      "sourceAddressPrefix": "10.20.1.0/24",
+                      "sourcePortRange": "*",
+                      "destinationAddressPrefix": "10.20.2.0/24",
+                      "destinationPortRange": "443",
+                      "description": "Permitir trafico de salida hacia Storage y Queue"
+                    }
+                  },
+                  {
+                    "name": "DenyAllVnetInbound",
+                    "properties": {
+                      "priority": 4095,
+                      "direction": "Inbound",
+                      "access": "Deny",
+                      "protocol": "*",
+                      "sourceAddressPrefix": "VirtualNetwork",
+                      "sourcePortRange": "*",
+                      "destinationAddressPrefix": "*",
+                      "destinationPortRange": "*",
+                      "description": "Principio Menor Acceso"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Microsoft.Network/networkSecurityGroups",
+              "apiVersion": "2023-09-01",
+              "name": "[variables('nsgStorageName')]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "securityRules": [
+                  {
+                    "name": "AllowAppServiceToBlob",
+                    "properties": {
+                      "priority": 100,
+                      "direction": "Inbound",
+                      "access": "Allow",
+                      "protocol": "Tcp",
+                      "sourceAddressPrefix": "10.20.1.0/24",
+                      "sourcePortRange": "*",
+                      "destinationAddressPrefix": "10.20.2.0/24",
+                      "destinationPortRange": "443",
+                      "description": "Guardar transacciones"
+                    }
+                  },
+                  {
+                    "name": "AllowAppServiceToQueue",
+                    "properties": {
+                      "priority": 110,
+                      "direction": "Inbound",
+                      "access": "Allow",
+                      "protocol": "Tcp",
+                      "sourceAddressPrefix": "10.20.1.0/24",
+                      "sourcePortRange": "*",
+                      "destinationAddressPrefix": "10.20.2.0/24",
+                      "destinationPortRange": "443",
+                      "description": "Enviar mensajes"
+                    }
+                  },
+                  {
+                    "name": "DenyInternetToStorage",
+                    "properties": {
+                      "priority": 4000,
+                      "direction": "Inbound",
+                      "access": "Deny",
+                      "protocol": "*",
+                      "sourceAddressPrefix": "Internet",
+                      "sourcePortRange": "*",
+                      "destinationAddressPrefix": "10.20.2.0/24",
+                      "destinationPortRange": "*",
+                      "description": "Bloqueado por seguridad"
+                    }
+                  },
+                  {
+                    "name": "DenyStorageToInternet",
+                    "properties": {
+                      "priority": 4000,
+                      "direction": "Outbound",
+                      "access": "Deny",
+                      "protocol": "*",
+                      "sourceAddressPrefix": "10.20.2.0/24",
+                      "sourcePortRange": "*",
+                      "destinationAddressPrefix": "Internet",
+                      "destinationPortRange": "*",
+                      "description": "Bloqueado por seguridad"
+                    }
+                  },
+                  {
+                    "name": "DenyAllVnetInbound",
+                    "properties": {
+                      "priority": 4095,
+                      "direction": "Inbound",
+                      "access": "Deny",
+                      "protocol": "*",
+                      "sourceAddressPrefix": "VirtualNetwork",
+                      "sourcePortRange": "*",
+                      "destinationAddressPrefix": "*",
+                      "destinationPortRange": "*",
+                      "description": "Principio Menor Acceso"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Microsoft.Network/networkSecurityGroups",
+              "apiVersion": "2023-09-01",
+              "name": "[variables('nsgMgtName')]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "securityRules": []
+              }
+            },
+            {
+              "type": "Microsoft.Network/virtualNetworks",
+              "apiVersion": "2023-09-01",
+              "name": "[variables('vnetName')]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "addressSpace": {
+                  "addressPrefixes": [
+                    "[variables('vnetPrefix')]"
+                  ]
+                },
+                "subnets": [
+                  {
+                    "name": "[format('snet-{0}-{1}-{2}-{3}-app', parameters('prefix'), parameters('env'), parameters('regionShort'), parameters('instance'))]",
+                    "properties": {
+                      "addressPrefix": "10.20.1.0/24",
+                      "networkSecurityGroup": {
+                        "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgAppName'))]"
+                      },
+                      "delegations": [
+                        {
+                          "name": "Microsoft.Web.serverFarms",
+                          "properties": {
+                            "serviceName": "Microsoft.Web/serverFarms"
+                          }
+                        }
+                      ],
+                      "serviceEndpoints": [
+                        {
+                          "service": "Microsoft.Storage"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "name": "[format('snet-{0}-{1}-{2}-{3}-st', parameters('prefix'), parameters('env'), parameters('regionShort'), parameters('instance'))]",
+                    "properties": {
+                      "addressPrefix": "10.20.2.0/24",
+                      "networkSecurityGroup": {
+                        "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgStorageName'))]"
+                      }
+                    }
+                  },
+                  {
+                    "name": "[format('snet-{0}-{1}-{2}-{3}-db', parameters('prefix'), parameters('env'), parameters('regionShort'), parameters('instance'))]",
+                    "properties": {
+                      "addressPrefix": "10.20.3.0/24"
+                    }
+                  },
+                  {
+                    "name": "[format('snet-{0}-{1}-{2}-{3}-scoring', parameters('prefix'), parameters('env'), parameters('regionShort'), parameters('instance'))]",
+                    "properties": {
+                      "addressPrefix": "10.20.4.0/24"
+                    }
+                  },
+                  {
+                    "name": "[format('snet-{0}-{1}-{2}-{3}-mgt', parameters('prefix'), parameters('env'), parameters('regionShort'), parameters('instance'))]",
+                    "properties": {
+                      "addressPrefix": "10.20.5.0/24",
+                      "networkSecurityGroup": {
+                        "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgMgtName'))]"
+                      }
+                    }
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgAppName'))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgMgtName'))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgStorageName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "vnetId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]"
+            },
+            "vnetName": {
+              "type": "string",
+              "value": "[variables('vnetName')]"
+            },
+            "subnetAppId": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Network/virtualNetworks', variables('vnetName')), '2023-09-01').subnets[0].id]"
+            },
+            "subnetStorageId": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Network/virtualNetworks', variables('vnetName')), '2023-09-01').subnets[1].id]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', variables('rgName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "deploy-storage",
+      "resourceGroup": "[variables('rgName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "prefix": {
+            "value": "[parameters('prefix')]"
+          },
+          "env": {
+            "value": "[parameters('env')]"
+          },
+          "instance": {
+            "value": "[parameters('instance')]"
+          },
+          "regionShort": {
+            "value": "[parameters('regionShort')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "subnetAppId": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', 'deploy-network'), '2025-04-01').outputs.subnetAppId.value]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.45.15.27210",
+              "templateHash": "13844292715129332520"
+            }
+          },
+          "parameters": {
+            "prefix": {
+              "type": "string"
+            },
+            "env": {
+              "type": "string"
+            },
+            "instance": {
+              "type": "string"
+            },
+            "regionShort": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string",
+              "defaultValue": "[resourceGroup().location]"
+            },
+            "subnetAppId": {
+              "type": "string"
+            }
+          },
+          "variables": {
+            "saBaseName": "[format('st{0}{1}{2}{3}', parameters('prefix'), parameters('env'), parameters('regionShort'), parameters('instance'))]",
+            "storageAccountName": "[take(format('{0}{1}', variables('saBaseName'), uniqueString(resourceGroup().id)), 24)]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Storage/storageAccounts",
+              "apiVersion": "2023-01-01",
+              "name": "[variables('storageAccountName')]",
+              "location": "[parameters('location')]",
+              "sku": {
+                "name": "Standard_LRS"
+              },
+              "kind": "StorageV2",
+              "properties": {
+                "supportsHttpsTrafficOnly": true,
+                "minimumTlsVersion": "TLS1_2",
+                "networkAcls": {
+                  "bypass": "AzureServices",
+                  "defaultAction": "Deny",
+                  "virtualNetworkRules": [
+                    {
+                      "id": "[parameters('subnetAppId')]",
+                      "action": "Allow"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Storage/storageAccounts/blobServices",
+              "apiVersion": "2023-01-01",
+              "name": "[format('{0}/{1}', variables('storageAccountName'), 'default')]",
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+              "apiVersion": "2023-01-01",
+              "name": "[format('{0}/{1}/{2}', variables('storageAccountName'), 'default', 'transacciones')]",
+              "properties": {
+                "publicAccess": "None"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', variables('storageAccountName'), 'default')]"
+              ]
+            },
+            {
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+              "apiVersion": "2023-01-01",
+              "name": "[format('{0}/{1}/{2}', variables('storageAccountName'), 'default', 'identity-documents')]",
+              "properties": {
+                "publicAccess": "None"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', variables('storageAccountName'), 'default')]"
+              ]
+            },
+            {
+              "type": "Microsoft.Storage/storageAccounts/queueServices",
+              "apiVersion": "2023-01-01",
+              "name": "[format('{0}/{1}', variables('storageAccountName'), 'default')]",
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Storage/storageAccounts/queueServices/queues",
+              "apiVersion": "2023-01-01",
+              "name": "[format('{0}/{1}/{2}', variables('storageAccountName'), 'default', 'mensajes')]",
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/queueServices', variables('storageAccountName'), 'default')]"
+              ]
+            },
+            {
+              "type": "Microsoft.Storage/storageAccounts/managementPolicies",
+              "apiVersion": "2023-01-01",
+              "name": "[format('{0}/{1}', variables('storageAccountName'), 'default')]",
+              "properties": {
+                "policy": {
+                  "rules": [
+                    {
+                      "enabled": true,
+                      "name": "cost-optimization-rule",
+                      "type": "Lifecycle",
+                      "definition": {
+                        "actions": {
+                          "baseBlob": {
+                            "tierToCool": {
+                              "daysAfterModificationGreaterThan": 30
+                            },
+                            "tierToArchive": {
+                              "daysAfterModificationGreaterThan": 90
+                            },
+                            "delete": {
+                              "daysAfterModificationGreaterThan": 365
+                            }
+                          }
+                        },
+                        "filters": {
+                          "blobTypes": [
+                            "blockBlob"
+                          ],
+                          "prefixMatch": [
+                            "transacciones/",
+                            "identity-documents/"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "storageAccountId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]"
+            },
+            "storageAccountName": {
+              "type": "string",
+              "value": "[variables('storageAccountName')]"
+            },
+            "storageAccountBlobEndpoint": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName')), '2023-01-01').primaryEndpoints.blob]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', 'deploy-network')]",
+        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', variables('rgName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "deploy-app",
+      "resourceGroup": "[variables('rgName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "prefix": {
+            "value": "[parameters('prefix')]"
+          },
+          "env": {
+            "value": "[parameters('env')]"
+          },
+          "instance": {
+            "value": "[parameters('instance')]"
+          },
+          "regionShort": {
+            "value": "[parameters('regionShort')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "subnetAppId": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', 'deploy-network'), '2025-04-01').outputs.subnetAppId.value]"
+          },
+          "storageAccountBlobEndpoint": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', 'deploy-storage'), '2025-04-01').outputs.storageAccountBlobEndpoint.value]"
+          },
+          "appServiceSku": {
+            "value": "[parameters('appServiceSku')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.45.15.27210",
+              "templateHash": "2343013768136690745"
+            }
+          },
+          "parameters": {
+            "prefix": {
+              "type": "string"
+            },
+            "env": {
+              "type": "string"
+            },
+            "instance": {
+              "type": "string"
+            },
+            "regionShort": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string",
+              "defaultValue": "[resourceGroup().location]"
+            },
+            "subnetAppId": {
+              "type": "string"
+            },
+            "storageAccountBlobEndpoint": {
+              "type": "string"
+            },
+            "appServiceSku": {
+              "type": "string",
+              "defaultValue": "B1"
+            }
+          },
+          "variables": {
+            "planName": "[format('plan-{0}-{1}-{2}-{3}', parameters('prefix'), parameters('env'), parameters('regionShort'), parameters('instance'))]",
+            "appName": "[format('app-{0}-{1}-{2}-{3}', parameters('prefix'), parameters('env'), parameters('regionShort'), parameters('instance'))]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Web/serverfarms",
+              "apiVersion": "2022-09-01",
+              "name": "[variables('planName')]",
+              "location": "[parameters('location')]",
+              "sku": {
+                "name": "[parameters('appServiceSku')]"
+              },
+              "properties": {
+                "reserved": true
+              },
+              "kind": "linux"
+            },
+            {
+              "type": "Microsoft.Web/sites",
+              "apiVersion": "2022-09-01",
+              "name": "[variables('appName')]",
+              "location": "[parameters('location')]",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('planName'))]",
+                "virtualNetworkSubnetId": "[if(and(not(equals(parameters('appServiceSku'), 'F1')), not(equals(parameters('appServiceSku'), 'D1'))), parameters('subnetAppId'), null())]",
+                "siteConfig": {
+                  "linuxFxVersion": "PYTHON|3.11",
+                  "alwaysOn": "[and(not(equals(parameters('appServiceSku'), 'F1')), not(equals(parameters('appServiceSku'), 'D1')))]",
+                  "appSettings": [
+                    {
+                      "name": "CENTINELA_STORAGE_BACKEND",
+                      "value": "blob"
+                    },
+                    {
+                      "name": "CENTINELA_BLOB_ACCOUNT_URL",
+                      "value": "[parameters('storageAccountBlobEndpoint')]"
+                    },
+                    {
+                      "name": "CENTINELA_BLOB_CONTAINER_RAW_TRANSACTIONS",
+                      "value": "transacciones"
+                    }
+                  ]
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', variables('planName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "webAppId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Web/sites', variables('appName'))]"
+            },
+            "webAppName": {
+              "type": "string",
+              "value": "[variables('appName')]"
+            },
+            "webAppPrincipalId": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Web/sites', variables('appName')), '2022-09-01', 'full').identity.principalId]"
+            },
+            "webAppHostName": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Web/sites', variables('appName')), '2022-09-01').defaultHostName]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', 'deploy-network')]",
+        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', variables('rgName'))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', 'deploy-storage')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "deploy-rbac",
+      "resourceGroup": "[variables('rgName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "principalId": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', 'deploy-app'), '2025-04-01').outputs.webAppPrincipalId.value]"
+          },
+          "storageAccountName": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', 'deploy-storage'), '2025-04-01').outputs.storageAccountName.value]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.45.15.27210",
+              "templateHash": "784736060775279471"
+            }
+          },
+          "parameters": {
+            "storageAccountName": {
+              "type": "string"
+            },
+            "principalId": {
+              "type": "string"
+            }
+          },
+          "variables": {
+            "blobContributorRoleId": "ba92f5b4-2d11-453d-a403-e96b0029c9fe",
+            "queueContributorRoleId": "974c5e8b-45b9-4653-ba55-5f855dd0fb88"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]",
+              "name": "[guid(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), parameters('principalId'), variables('blobContributorRoleId'))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('blobContributorRoleId'))]",
+                "principalId": "[parameters('principalId')]",
+                "principalType": "ServicePrincipal"
+              }
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]",
+              "name": "[guid(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), parameters('principalId'), variables('queueContributorRoleId'))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('queueContributorRoleId'))]",
+                "principalId": "[parameters('principalId')]",
+                "principalType": "ServicePrincipal"
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', 'deploy-app')]",
+        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', variables('rgName'))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', 'deploy-storage')]"
+      ]
+    }
+  ],
+  "outputs": {
+    "webAppName": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', 'deploy-app'), '2025-04-01').outputs.webAppName.value]"
+    },
+    "resourceGroupName": {
+      "type": "string",
+      "value": "[variables('rgName')]"
+    }
+  }
+}
