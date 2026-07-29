@@ -28,6 +28,14 @@ class Settings(BaseSettings):
     blob_account_url: str | None = None
     blob_container_raw_transactions: str = "raw-transactions"
 
+    # Contenedor de documentos de verificación de identidad (sección 2.10).
+    # El nombre del blob lo genera el sistema, nunca el usuario.
+    identity_blob_container: str = "identity-documents"
+
+    # Tamaño máximo de archivo para carga de documentos de identidad (sección 2.10).
+    # Default: 10 MB. Ajustar por configuración según el perfil de documentos esperados.
+    max_document_size_bytes: int = 10_485_760  # 10 MB
+
     event_publisher_backend: EventPublisherBackend = EventPublisherBackend.NOOP
 
     # Monto máximo aceptado, en unidad monetaria menor (ver docs/contrato-transaccion.md).

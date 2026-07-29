@@ -47,3 +47,22 @@ transacción persistida se recupera por su identificador" (sección 4 y
 criterios de aceptación de Azure-Semana1.md). No implementa consulta de
 historial, cálculo de score ni ninguna lógica de análisis — solo devuelve el
 documento crudo tal como se persistió.
+
+## `POST /documents`
+
+Carga un documento de verificación de identidad (sección 2.10).
+Body: `multipart/form-data` con campo `file`.
+
+| Escenario | Código | Cuerpo (resumen) |
+|---|---|---|
+| Archivo válido cargado exitosamente | `201 Created` | `{status: "accepted", document_id, blob_name, content_type, size_bytes, uploaded_at}` |
+| Tipo de archivo no permitido (no es PDF/JPEG/PNG según magic bytes) | `400 Bad Request` | `{error: "tipo_archivo_no_permitido", detail: "..."}` |
+| Archivo supera el tamaño máximo (`CENTINELA_MAX_DOCUMENT_SIZE_BYTES`) | `400 Bad Request` | `{error: "archivo_demasiado_grande", detail: "..."}` |
+| Backend de almacenamiento no configurado como `blob` | `503 Service Unavailable` | `{error: "almacenamiento_no_disponible", detail: "..."}` |
+| Falla inesperada del backend | `500 Internal Server Error` | `{error: "error_interno"}` |
+
+**Nota:** la validación de tipo es por contenido real (magic bytes), no por extensión.
+Un archivo `.pdf` renombrado a `.jpg` se detecta y acepta correctamente como PDF.
+Un archivo `.exe` renombrado a `.pdf` es rechazado con `400`. El nombre del blob
+en destino siempre lo genera el sistema — nunca el nombre proporcionado por el usuario.
+
