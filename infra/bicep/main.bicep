@@ -3,8 +3,8 @@ targetScope = 'subscription'
 param prefix string = 'trial'
 param env string = 'dev'
 param instance string = '001'
-param regionShort string = 'eus2'
-param location string = 'eastus2'
+param regionShort string = 'weu'
+param location string = 'westeurope'
 param alertEmail string
 @allowed([
   'F1'
@@ -107,7 +107,6 @@ module eventing 'modules/eventing.bicep' = {
     instance: instance
     regionShort: regionShort
     location: location
-    subnetScoringId: network.outputs.subnetScoringId
   }
 }
 

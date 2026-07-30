@@ -32,26 +32,24 @@ az consumption usage list \
 
 ## 3. Estimado de referencia de los componentes nuevos (no es consumo real)
 
-De `README.md` §Análisis de Costos:
+Este estimado refleja los componentes **efectivamente desplegados** en el
+despliegue real de semana 2 (grupo `rg-trial-dev-cus-003`, región `centralus`).
+En varios casos el estimado inicial cambió por las decisiones documentadas
+en ADR-022 (`docs/decisiones-arquitectura.md`):
 
-| Componente | Estimado | Riesgo |
+| Componente | Estimado | Nota |
 |---|---|---|
-| Cosmos DB (Free Tier) | $0.00 | Elegibilidad no verificada — uno por suscripción |
-| Azure SQL (Serverless GP, Free Offer) | ~$0.00 | Elegibilidad no verificada; fallback Basic ~$5/mes si no aplica |
+| Cosmos DB (sin Free Tier) | ~$1.00/día | Free Tier no aplicable (ADR-022a). Depende del consumo de RU y almacenamiento real |
+| Azure SQL (Basic, ~5 DTU) | ~$5/mes | Serverless Free Offer no disponible; desplegado en tier Basic, el más económico disponible |
 | Event Grid | Centavos | Pay-per-operation, volumen de prueba |
 | Service Bus (Basic) | Centavos | Pay-per-operation, sin costo base |
-| 2 Function Apps (Consumption) | ~$0.00 | Dentro de la capa gratuita mensual de ejecuciones |
+| 3 App Service Plans B1 (API + Scoring + Casos) | ~$0.018/h cada uno | Functions migradas a B1 por VNet Integration (ADR-022b). 3 planes × ~$0.018 USD/h = ~$0.054 USD/h |
 | Storage Account de runtime (Functions) | ~$0.10 | LRS, mínimo tráfico |
-| **Total estimado, componentes nuevos** | **Unos pocos USD** | Depende críticamente de que ambos Free Tier/Offer apliquen |
+| **Total estimado, componentes nuevos** | **~$1.50-$2.50 USD/día** | Dominado por Cosmos DB (~$1/día) y los 3 planes B1 (~$1.30/día a 24h). Apagar el grupo de recursos por las noches reduce el impacto de los B1 |
 
-Sumado al estimado de semana 1 (~$10-$14, `docs/reporte-credito-consumido.md`
-§3), el estimado acumulado de referencia (no verificado) queda **bien por
-debajo de $40**, pero con más riesgo de desviación que semana 1: dos
-Free Tier/Offer distintos deben ambos aplicar para que el estimado se
-sostenga. Si cualquiera de los dos no aplica, revisar el fallback
-documentado en cada caso (`docs/justificacion-particionamiento-cosmos.md`
-§4, `docs/estrategia-respaldo-sql.md` — la elegibilidad del Free Offer se
-verifica junto con el resto de la instancia real).
+Sumado al estimado de semana 1 (~$10-$14 acumulado), el estimado actualizado
+cumple el límite de $40 USD si el grupo de recursos se destruye al terminar
+la semana 2 (21 días máximos de operación, con apagado nocturno activo).
 
 ## 4. Por qué el consumo real de semana 2 probablemente sea mayor al estimado
 

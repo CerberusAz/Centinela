@@ -16,7 +16,6 @@ param env string
 param instance string
 param regionShort string
 param location string = resourceGroup().location
-param subnetScoringId string
 
 var eventGridTopicName = 'evt-${prefix}-${env}-${regionShort}-${instance}'
 var serviceBusNamespaceName = 'sb-${prefix}-${env}-${regionShort}-${instance}'
@@ -50,24 +49,7 @@ resource serviceBusNamespace 'Microsoft.ServiceBus/namespaces@2022-10-01-preview
   }
 }
 
-// Defensa en profundidad, mismo patrón que Storage/Cosmos/SQL: aunque
-// disableLocalAuth ya exige AAD, se restringe además el origen de red a
-// la subred que realmente necesita tocar Service Bus (snet-scoring).
-resource serviceBusNetworkRules 'Microsoft.ServiceBus/namespaces/networkRuleSets@2022-10-01-preview' = {
-  parent: serviceBusNamespace
-  name: 'default'
-  properties: {
-    defaultAction: 'Deny'
-    virtualNetworkRules: [
-      {
-        subnet: {
-          id: subnetScoringId
-        }
-        ignoreMissingVnetServiceEndpoint: false
-      }
-    ]
-  }
-}
+
 
 resource casosQueue 'Microsoft.ServiceBus/namespaces/queues@2022-10-01-preview' = {
   parent: serviceBusNamespace

@@ -55,8 +55,8 @@ resource scoringPlan 'Microsoft.Web/serverfarms@2022-09-01' = {
   name: scoringPlanName
   location: location
   sku: {
-    name: 'Y1'
-    tier: 'Dynamic'
+    name: 'B1'
+    tier: 'Basic'
   }
   properties: {
     reserved: true
@@ -97,8 +97,8 @@ resource casesPlan 'Microsoft.Web/serverfarms@2022-09-01' = {
   name: casesPlanName
   location: location
   sku: {
-    name: 'Y1'
-    tier: 'Dynamic'
+    name: 'B1'
+    tier: 'Basic'
   }
   properties: {
     reserved: true
@@ -133,26 +133,7 @@ resource casesFunctionApp 'Microsoft.Web/sites@2022-09-01' = {
   }
 }
 
-// Referencia al topic ya creado en eventing.bicep, para colgar la
-// suscripción que dispara el motor de scoring.
-resource eventGridTopic 'Microsoft.EventGrid/topics@2023-12-15-preview' existing = {
-  name: eventGridTopicName
-}
 
-resource eventGridSubscription 'Microsoft.EventGrid/eventSubscriptions@2023-12-15-preview' = {
-  name: 'sub-scoring-function'
-  scope: eventGridTopic
-  properties: {
-    destination: {
-      endpointType: 'AzureFunction'
-      properties: {
-        resourceId: '${scoringFunctionApp.id}/functions/ScoringFunction'
-        maxEventsPerBatch: 1
-      }
-    }
-    eventDeliverySchema: 'EventGridSchema'
-  }
-}
 
 output scoringFunctionAppName string = scoringFunctionApp.name
 output scoringFunctionPrincipalId string = scoringFunctionApp.identity.principalId

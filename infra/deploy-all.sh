@@ -12,9 +12,9 @@ export ALERT_EMAIL="san.mu.zap@gmail.com"
 export PROJECT_PREFIX="trial"
 export ENVIRONMENT="dev"
 export INSTANCE="003"
-export LOCATION="westeurope"
-export REGION_SHORT="weu"
-export APP_SERVICE_SKU="B1" # B1 en westeurope para asegurar cuota activa y VNet Integration
+export LOCATION="centralus"
+export REGION_SHORT="cus"
+export APP_SERVICE_SKU="B1" # Mantenemos B1
 
 # Semana 2: Azure SQL requiere un admin AAD en la creación del servidor
 # (azureADOnlyAuthentication=true, sin usuario/contraseña SQL). Se toma la
@@ -110,6 +110,15 @@ deploy_function_code() {
 
 echo "[Paso 3 de 4] Desplegando el motor de scoring ($SCORING_FUNCTION_NAME)..."
 deploy_function_code "$(cd "$SCRIPT_DIR/../scoring" &> /dev/null && pwd)" "$SCORING_FUNCTION_NAME" "scoring"
+
+echo "Configurando suscripción de Event Grid hacia la Azure Function..."
+SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+az eventgrid event-subscription create \
+  --name sub-scoring-function \
+  --source-resource-id "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RG_NAME/providers/Microsoft.EventGrid/topics/evt-$PROJECT_PREFIX-$ENVIRONMENT-$REGION_SHORT-$INSTANCE" \
+  --endpoint-type azurefunction \
+  --endpoint "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RG_NAME/providers/Microsoft.Web/sites/$SCORING_FUNCTION_NAME/functions/ScoringFunction" \
+  -o none
 
 echo "[Paso 4 de 4] Desplegando la creación de casos ($CASES_FUNCTION_NAME)..."
 deploy_function_code "$(cd "$SCRIPT_DIR/../cases" &> /dev/null && pwd)" "$CASES_FUNCTION_NAME" "cases"

@@ -37,7 +37,7 @@ var eventGridDataSenderRoleId = 'd5a91429-5739-47e2-a06b-3470a27159e7'
 // Azure Service Bus Data Sender
 var serviceBusDataSenderRoleId = '69a216fc-b8fb-44d8-bc22-1f3c2cd27a39'
 // Azure Service Bus Data Receiver
-var serviceBusDataReceiverRoleId = '4f6d3b9a-ce61-419d-b7dc-2df1f8562b04'
+var serviceBusDataReceiverRoleId = '4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0'
 // Storage Blob Data Owner (AzureWebJobsStorage por identidad requiere Owner, no solo Contributor)
 var blobDataOwnerRoleId = 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
 // Storage Table Data Contributor (AzureWebJobsStorage usa Tables para checkpoints/locks)

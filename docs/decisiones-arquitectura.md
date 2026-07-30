@@ -92,24 +92,32 @@ cambiando `CENTINELA_EVENT_PUBLISHER_BACKEND` por configuración.
 
 ---
 
-## ADR-009 — Región de despliegue: West Europe sobre East US 2 (Persona 1)
+## ADR-009 — Región de despliegue: Central US (evolución desde West Europe) (Persona 1)
 
 **Contexto:** el default original del script (`main.bicep`) era
-`eastus2`. Al primer despliegue, la suscripción de prueba devolvió
-`SubscriptionIsOverQuotaForSku` para planes Linux — cuota 0 confirmada vía
-`az rest` contra la API de uso real, no asumida.
+`eastus2`. Al primer despliegue de semana 1, la suscripción devolvió
+`SubscriptionIsOverQuotaForSku` para planes Linux — cuota 0 confirmada;
+se migró a `westeurope`, que tenía cuota activa para App Service B1 Linux.
+Al llegar a semana 2, Azure devolvió `RegionDoesNotAllowProvisioning`
+para SQL Database y `ServiceUnavailable` para Cosmos DB en `westeurope`.
+Se intentó `northeurope` con idéntico resultado. Una estrategia
+multi-región (VNet en `westeurope`, BD en `canadacentral`) fue bloqueada
+por Azure con `VirtualNetworkRuleBadRequest`: un Service Endpoint solo
+protege recursos de la misma región que la VNet.
 
-**Decisión:** `westeurope`, única región que confirmó cuota activa para
-B1 Linux con VNet Integration en una prueba empírica sobre 7 regiones
-candidatas. Justificación completa, incluyendo el hueco pendiente de
-verificar Cosmos DB/SQL para semana 2, en `docs/justificacion-region.md`.
+**Decisión:** `centralus`, verificada empíricamente como la primera
+región con disponibilidad simultánea de SQL Database, Cosmos DB, App
+Service B1 Linux y Azure Functions con VNet Integration. Justificación
+completa del proceso de eliminación de candidatos en
+`docs/justificacion-region.md`.
 
-**Alternativas descartadas:** `eastus2` (cuota 0, bloqueo duro), otras 6
-regiones probadas en el mismo lote sin confirmar viabilidad para B1 Linux.
+**Alternativas descartadas:** `eastus2` (cuota 0), `westeurope`/`northeurope`
+(sin capacidad física para BD en suscripción de prueba), `canadacentral`
+(VNet cross-región ilegal con Service Endpoints).
 
-**Consecuencias:** `regionShort=weu` se propaga a todos los módulos Bicep
-vía el parámetro `regionShort` de `main.bicep`; ningún nombre de recurso
-quedó hardcodeado a `eus2`.
+**Consecuencias:** `regionShort=cus` se propaga a todos los módulos Bicep;
+el grupo de recursos definitivo es `rg-trial-dev-cus-003`; los recursos
+desplegados son `sql-trial-dev-cus-003`, `cosmos-trial-dev-cus-003`, etc.
 
 ## ADR-010 — Convención de nombres: patrón posicional + resolución de unicidad global (Persona 1)
 
@@ -469,3 +477,105 @@ degradaría (límite efectivo = `max_requests × instancias`) si se
 habilita auto-escalado horizontal en semana 3. Ver `docs/limite-tasa-api.md`
 §4. Probado con 6 tests (`api/tests/test_rate_limit.py`), incluida la
 reactivación del límite tras pasar la ventana usando un reloj inyectable.
+
+---
+
+## ADR-022 — Decisiones adoptadas durante el despliegue real de semana 2
+
+**Contexto:** durante el proceso de despliegue de la infraestructura de
+semana 2 surgieron 5 bloqueos que requirieron decisiones de diseño no
+documentadas en los ADR anteriores (escritos antes del despliegue real).
+Se documentan aquí como registro honesto y trazable.
+
+### 22a — `enableFreeTier: false` en Cosmos DB
+
+**Problema:** Azure permite una sola cuenta Cosmos DB con Free Tier por
+suscripción. Al haber creado y eliminado cuentas de prueba durante las
+iteraciones de despliegue, Azure mantuvo el beneficio como "consumido"
+e impidió crear la cuenta con `enableFreeTier: true`, retornando
+`BadRequest: Free tier has already been applied`.
+
+**Decisión:** `enableFreeTier: false` en `infra/bicep/modules/cosmos.bicep`.
+
+**Consecuencia de costo:** Cosmos DB pasa de $0.00 a ~$1 USD/día. Para
+una evaluación de ~21 días, el impacto es manejable dentro del presupuesto
+de $40 USD si el grupo de recursos se destruye al terminar. El estimado
+de semana 2 en `docs/reporte-credito-semana2.md` §3 debe leerse con este ajuste.
+
+### 22b — Azure Functions en plan B1 (no Y1/Consumption) por VNet
+
+**Problema:** el diseño original usaba planes Consumption (Y1) para las
+Azure Functions por su modelo serverless y costo cero. Azure devolvió:
+`SKU '' does not support Virtual Network Integration`. Los planes de
+consumo (Y1) no soportan la integración con VNet que exige el aislamiento
+de red de la semana 2.
+
+**Decisión:** cambiar el SKU de `plan-scoring-*` y `plan-cases-*` de
+`Y1 / Dynamic` a `B1 / Basic` en `infra/bicep/modules/functions.bicep`.
+
+**Consecuencia de costo:** las 2 Functions pasan de $0.00 a ~$0.02 USD/h
+cada una (mismo tier que el App Service de la API). El modelo de billing
+cambia de pay-per-execution a pay-per-hour, igual que el plan B1 de la API
+(ver `docs/nivel-servicio-costo.md` §3 y §4).
+
+**Consecuencia de arquitectura:** los componentes serverless de semana 2
+no son serverless en el sentido estricto (no escalan a 0), pero mantienen
+la separación de función (planes y sitios independientes). La capacidad de
+escalar a cero se sacrifica por el requisito de aislamiento de red.
+
+### 22c — Suscripción de Event Grid desacoplada de Bicep
+
+**Problema:** Bicep creaba la suscripción de Event Grid hacia la Azure
+Function al mismo tiempo que creaba la Function. Azure Event Grid
+valida el webhook (la URL de la function) inmediatamente, antes de que
+el código Python esté desplegado — la URL responde `NotFound` y el
+despliegue falla con `Webhook endpoint validation failed`.
+
+**Decisión:** eliminar el recurso `eventGridSubscription` de
+`infra/bicep/modules/functions.bicep` y registrarlo como un paso
+post-despliegue de código en `infra/deploy-all.sh` usando
+`az eventgrid event-subscription create`, ejecutado solo después de
+que el código de la Function está desplegado y la URL existe.
+
+**Consecuencia:** el despliegue de infraestructura y el de código son
+independientes. El primero (Bicep) crea los recursos; el segundo
+(deploy-all.sh paso 3) conecta Event Grid cuando la función ya tiene
+el código. Si alguien ejecuta solo el módulo Bicep sin el script completo,
+Event Grid quedará sin suscripción y el motor de scoring no será disparado
+automáticamente — queda documentado en el comentario del script.
+
+### 22d — Service Bus sin restricción de red (limitación del tier Basic)
+
+**Problema:** el módulo `eventing.bicep` original incluía un recurso
+`networkRuleSet` para restringir el acceso de Service Bus a `snet-scoring`.
+Azure devolvió `InvalidSkuForNetworkRuleSet`: el tier Basic no soporta
+reglas de red de VNet.
+
+**Decisión:** eliminar el recurso `serviceBusNetworkRules` de
+`infra/bicep/modules/eventing.bicep`. Service Bus Basic opera sin
+aislamiento de subred, pero mantiene `disableLocalAuth: true` — la
+autenticación sigue siendo exclusivamente AAD, sin claves compartidas.
+
+**Consecuencia:** el acceso a Service Bus desde internet es técnicamente
+posible para cualquier identidad autenticada con AAD. Para habilitar las
+reglas de red se necesitaría subir a tier Standard (~$10 USD/mes base),
+fuera del presupuesto de la semana. Queda registrado como mejora futura.
+Este cambio se refleja en `docs/mensajeria-semana2.md` §1 (columna
+"Restricción de red").
+
+### 22e — GUID corregido: Azure Service Bus Data Receiver
+
+**Problema:** el GUID del rol `Azure Service Bus Data Receiver` en
+`infra/bicep/modules/rbac.bicep` estaba corrupto
+(`4f6d3b9a-ce61-419d-b7dc-2df1f8562b04`). El despliegue falló con
+`RoleDefinitionDoesNotExist`. El mismo patrón ya ocurrió en semana 1
+con el GUID de `Storage Queue Data Contributor`.
+
+**Decisión:** corregir con el GUID oficial verificado contra
+`az role definition list --name "Azure Service Bus Data Receiver"`:
+`4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0`.
+
+**Consecuencia:** la nota en `rbac.bicep` advertía explícitamente que
+los GUIDs de semana 2 no habían sido verificados. El fallo confirmó el
+riesgo señalado — los GUIDs de rol de Azure siempre deben verificarse
+contra la CLI antes de incluirlos en Bicep.

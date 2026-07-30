@@ -15,7 +15,7 @@ explícitamente.
 | **Garantía de entrega** | Reintentos con backoff exponencial, expira (~24h por defecto) si nadie confirma | At-least-once, con dead-lettering NATIVO (`maxDeliveryCount`) |
 | **¿Hay cola persistente consultable?** | No — es pub/sub, no hay "profundidad de cola" que inspeccionar | Sí — `ApproximateMessageCount`, mensajes visibles hasta ser completados |
 | **Autenticación** | AAD, rol "EventGrid Data Sender" (sin la clave del topic) | AAD, roles "Azure Service Bus Data Sender/Receiver" (`disableLocalAuth: true`, sin connection string con clave compartida) |
-| **Restricción de red** | Ninguna — Event Grid no soporta Service Endpoints de VNet | Service Endpoint restringido a `snet-scoring` (defensa en profundidad, además del AAD-only) |
+| **Restricción de red** | Ninguna — Event Grid no soporta Service Endpoints de VNet | Ninguna — tier Basic no soporta `networkRuleSet` (ver ADR-022d en `docs/decisiones-arquitectura.md`). Autenticación AAD-only sigue activa (`disableLocalAuth: true`) |
 
 ## 2. Por qué esta asignación y no la inversa
 

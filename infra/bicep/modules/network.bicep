@@ -70,7 +70,7 @@ resource nsgApp 'Microsoft.Network/networkSecurityGroups@2023-09-01' = {
           protocol: 'Tcp'
           sourceAddressPrefix: '10.20.1.0/24'
           sourcePortRange: '*'
-          destinationAddressPrefix: 'EventGrid'
+          destinationAddressPrefix: 'AzureEventGrid'
           destinationPortRange: '443'
           description: 'Semana 2: publicar el evento transaction.received (EventGridEventPublisher)'
         }
