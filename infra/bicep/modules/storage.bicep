@@ -65,6 +65,11 @@ resource queueMensajes 'Microsoft.Storage/storageAccounts/queueServices/queues@2
   name: 'mensajes'
 }
 
+resource queueMensajesPoison 'Microsoft.Storage/storageAccounts/queueServices/queues@2023-01-01' = {
+  parent: queueService
+  name: 'mensajes-poison'
+}
+
 resource managementPolicy 'Microsoft.Storage/storageAccounts/managementPolicies@2023-01-01' = {
   parent: storageAccount
   name: 'default'

@@ -1,8 +1,25 @@
 # Garantías de entrega — Cola de ingesta
 
-Entregable 22. Describe el comportamiento del sistema en los tres escenarios
-de la sección 2.11, aplicado a Azure Storage Queues (el servicio de cola
-usado en Centinela).
+Entregable 22 (semana 1). Describe el comportamiento del sistema en los
+tres escenarios de la sección 2.11, aplicado a Azure Storage Queues (el
+servicio de cola usado en Centinela esa semana).
+
+> **Nota de corrección — semana 2.** Este documento describe la cola
+> `mensajes` de Storage Queue tal como se diseñó en semana 1, cuando
+> `Azure-Semana1.md` no distinguía formalmente entre "distribuir un
+> evento" y "garantizar su procesamiento". `Azure-Semana2.md` sección 2.4
+> sí exige esa distinción como dos entregables separados, y el diseño
+> resultante usa **Event Grid** (distribución del evento de transacción) y
+> **Service Bus** (cola de casos marcados) — ver
+> `docs/mensajeria-semana2.md` para la comparación completa y la
+> justificación de por qué son servicios distintos, no una configuración
+> distinta del mismo servicio. Las colas `mensajes` y `mensajes-poison`
+> de Storage Queue documentadas abajo **quedan sin uso real** en el flujo
+> de producción de semana 2 en adelante — se mantienen desplegadas (costo
+> real con colas vacías: ~$0) porque ya estaban probadas y no se
+> justificaba el riesgo de tocar `storage.bicep`/`rbac.bicep` para
+> retirarlas. El resto de este documento se conserva sin modificar como
+> registro histórico de la decisión de semana 1.
 
 **Cola:** `mensajes` — creada en la Storage Account `sttrialdevweu003sdfafbu4`
 (módulo `infra/bicep/modules/storage.bicep`).
@@ -80,10 +97,13 @@ Cinco reintentos con un backoff progresivo cubren el 99% de los errores
 transitorios esperados en un entorno cloud (timeouts de red, reinicio de
 instancia, throttling momentáneo).
 
-**Nota de implementación:** la cola `mensajes-poison` también se crea como
-recurso de infraestructura en `infra/bicep/modules/storage.bicep` (pendiente
-de agregar en la siguiente iteración del script). La lógica de detección y
-movimiento vive en el consumidor (semana 2), no en la API de ingesta.
+**Nota de implementación:** la cola `mensajes-poison` se crea como recurso
+de infraestructura en `infra/bicep/modules/storage.bicep` junto a
+`mensajes`, en el mismo `queueService`. No requiere una asignación de rol
+RBAC adicional: `Storage Queue Data Contributor` (`infra/bicep/modules/rbac.bicep`)
+está asignado a nivel de la Storage Account completa, por lo que ya cubre
+ambas colas. La lógica de detección y movimiento vive en el consumidor
+(semana 2), no en la API de ingesta.
 
 **Riesgo documentado:** si el `visibility_timeout` es muy corto (< tiempo de
 procesamiento normal), mensajes válidos pueden incrementar `dequeue_count` sin

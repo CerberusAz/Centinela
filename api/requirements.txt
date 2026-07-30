@@ -4,6 +4,9 @@ pydantic>=2.6,<3.0
 pydantic-settings>=2.2,<3.0
 azure-storage-blob>=12.19,<13.0
 azure-identity>=1.15,<2.0
+azure-cosmos>=4.6,<5.0  # Semana 2: store operativo del motor de scoring (app/storage/cosmos_storage.py)
+azure-eventgrid>=4.15,<5.0  # Semana 2: distribución del evento de transacción (app/messaging/event_grid_publisher.py)
+aiohttp>=3.9,<4.0  # Transporte HTTP async requerido por azure-identity.aio / azure-storage-blob.aio
 python-dotenv>=1.0,<2.0
 python-multipart>=0.0.9,<1.0  # Requerido por FastAPI para UploadFile (POST /documents)
 

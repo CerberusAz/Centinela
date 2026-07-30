@@ -85,19 +85,32 @@ nunca hay credencial que gestionar.
 ### Autorización
 
 Para acceder al documento, el analista necesita una URL temporal (SAS token)
-generada por la Web App con la identidad de la Managed Identity.
+generada por la Web App con la identidad de la Managed Identity. Implementado
+en `GET /documents/access-url` (`api/app/storage/document_storage.py::generate_read_sas_url`).
 
 **Flujo:**
 ```
 Analista solicita acceso al documento D del caso C
-  └─ La Web App (Managed Identity) genera un SAS token con:
-       └─ permissions: 'r' (solo lectura)
-       └─ expiry: +30 minutos
-       └─ resource: blob específico (no el contenedor completo)
+  └─ GET /documents/access-url?blob_name=D
+       └─ La Web App pide un User Delegation Key a Microsoft Entra ID,
+          usando su propia Managed Identity (misma autenticación del
+          Ejemplo 1 — sin claves de cuenta en ningún punto)
+       └─ La Web App firma un SAS con ese delegation key:
+            └─ permissions: 'r' (solo lectura)
+            └─ expiry: +30 minutos
+            └─ resource: blob específico (no el contenedor completo)
   └─ El analista usa la URL con SAS para descargar el documento
-       └─ Azure Blob Storage valida la firma del SAS
+       └─ Azure Blob Storage valida la firma del SAS contra el delegation key
             └─ 200 OK — el analista lee el documento
 ```
+
+**Diferencia clave con un SAS de cuenta:** el SAS aquí lo firma un *user
+delegation key* emitido por Entra ID (acción `generateUserDelegationKey`,
+incluida en `Storage Blob Data Contributor`), no la clave de la cuenta de
+almacenamiento. Si la Managed Identity de la Web App perdiera el permiso,
+cualquier SAS ya emitido con su delegation key deja de ser válido en cuanto
+ese key expira (máximo 7 días) — no hay una clave de cuenta de larga vida
+que revocar.
 
 El analista **nunca** recibe acceso permanente al contenedor. Cada acceso es
 temporal y acotado al documento específico del caso. Esto cumple el requisito

@@ -1,0 +1,269 @@
+# ==============================================================================
+# .github/workflows/ci-cd.yml
+# Pipeline de integración y despliegue continuo — Centinela (Semana 3)
+#
+# Etapas:
+#   1. test      — Pruebas unitarias de API y motor de scoring (bloqueante)
+#   2. build     — Construcción de imágenes Docker multi-stage
+#   3. publish   — Push de imágenes al Azure Container Registry (ACR)
+#   4. deploy    — Despliegue de imágenes en Azure App Service / Functions
+#
+# Autenticación con Azure: OIDC Federated Identity (sin secretos de larga
+# duración). Requiere un paso manual previo de configuración en Azure AD;
+# ver docs/justificacion-cicd.md §3.
+#
+# Secretos requeridos en GitHub (Settings → Secrets → Actions):
+#   AZURE_CLIENT_ID       — Client ID de la App Registration federada
+#   AZURE_TENANT_ID       — Tenant ID de la suscripción
+#   AZURE_SUBSCRIPTION_ID — ID de la suscripción de Azure
+#   ACR_LOGIN_SERVER      — FQDN del ACR (ej: crtrialdevcus003.azurecr.io)
+#
+# Variables requeridas en GitHub (Settings → Variables → Actions):
+#   RESOURCE_GROUP        — Nombre del grupo de recursos (ej: rg-trial-dev-cus-003)
+#   APP_SERVICE_NAME      — Nombre del App Service de la API (ej: app-trial-dev-cus-003)
+#   SCORING_FUNCTION_NAME — Nombre de la Function de scoring
+#   CASES_FUNCTION_NAME   — Nombre de la Function de casos
+#   EXPLAINER_FUNCTION_NAME — Nombre de la Function explicadora
+# ==============================================================================
+
+name: CI/CD — Centinela
+
+on:
+  push:
+    branches:
+      - main           # Rama de producción: dispara despliegue completo
+  pull_request:
+    branches:
+      - main           # PRs: solo ejecuta test (no despliega)
+
+# Permisos mínimos para OIDC: el token de GitHub solo necesita
+# escribir el ID token para federar con Azure.
+permissions:
+  id-token: write   # Requerido por azure/login con OIDC
+  contents: read    # Leer el código del repositorio
+
+# ==============================================================================
+# JOB 1: Pruebas unitarias
+# Bloqueante — si falla, los demás jobs no se ejecutan.
+# ==============================================================================
+jobs:
+  test:
+    name: "🧪 Pruebas unitarias"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      # --- API (FastAPI) -------------------------------------------------------
+      - name: Configurar Python 3.11 (API)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: api/requirements.txt
+
+      - name: Instalar dependencias de la API
+        working-directory: api
+        run: pip install -r requirements.txt
+
+      - name: Ejecutar pruebas de la API
+        working-directory: api
+        run: pytest --tb=short -q
+
+      # --- Motor de scoring ----------------------------------------------------
+      - name: Instalar dependencias del motor de scoring
+        working-directory: scoring
+        run: pip install -r requirements.txt
+
+      - name: Ejecutar pruebas del motor de scoring
+        working-directory: scoring
+        run: pytest --tb=short -q
+
+  # ==============================================================================
+  # JOB 2: Build y push de imágenes al ACR
+  # Solo se ejecuta en push a main (no en PRs) y si las pruebas pasaron.
+  # ==============================================================================
+  build-and-publish:
+    name: "🐳 Build y Push de imágenes"
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tag }}
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      # Autenticación con Azure vía OIDC (sin contraseñas en el repositorio)
+      - name: Autenticar con Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # El ACR permite login con la identidad federada de Azure — sin
+      # usuario ni contraseña del registro.
+      - name: Autenticar con Azure Container Registry
+        run: az acr login --name ${{ secrets.ACR_LOGIN_SERVER }}
+
+      # Etiqueta de imagen: SHA corto del commit para trazabilidad exacta
+      - name: Calcular etiqueta de imagen
+        id: meta
+        run: echo "tag=$(echo ${{ github.sha }} | cut -c1-8)" >> $GITHUB_OUTPUT
+
+      # --- Imagen de la API ----------------------------------------------------
+      - name: Build imagen API
+        run: |
+          docker build \
+            --tag ${{ secrets.ACR_LOGIN_SERVER }}/centinela/api:${{ steps.meta.outputs.tag }} \
+            --tag ${{ secrets.ACR_LOGIN_SERVER }}/centinela/api:latest \
+            --file api/Dockerfile \
+            api/
+
+      - name: Push imagen API
+        run: |
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/centinela/api:${{ steps.meta.outputs.tag }}
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/centinela/api:latest
+
+      # --- Imagen del motor de scoring -----------------------------------------
+      - name: Build imagen scoring
+        run: |
+          docker build \
+            --tag ${{ secrets.ACR_LOGIN_SERVER }}/centinela/scoring:${{ steps.meta.outputs.tag }} \
+            --tag ${{ secrets.ACR_LOGIN_SERVER }}/centinela/scoring:latest \
+            --file scoring/Dockerfile \
+            scoring/
+
+      - name: Push imagen scoring
+        run: |
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/centinela/scoring:${{ steps.meta.outputs.tag }}
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/centinela/scoring:latest
+
+      # --- Imagen de la Function de casos -------------------------------------
+      - name: Build imagen cases
+        run: |
+          docker build \
+            --tag ${{ secrets.ACR_LOGIN_SERVER }}/centinela/cases:${{ steps.meta.outputs.tag }} \
+            --tag ${{ secrets.ACR_LOGIN_SERVER }}/centinela/cases:latest \
+            --file cases/Dockerfile \
+            cases/
+
+      - name: Push imagen cases
+        run: |
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/centinela/cases:${{ steps.meta.outputs.tag }}
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/centinela/cases:latest
+
+      # --- Imagen de la Function del explicador -------------------------------
+      - name: Build imagen explainer
+        run: |
+          # El explicador comparte el modelo de datos con la function de casos.
+          # Copiamos db.py y models.py al contexto temporalmente antes del build.
+          cp cases/db.py explainer/
+          cp cases/models.py explainer/
+          docker build \
+            --tag ${{ secrets.ACR_LOGIN_SERVER }}/centinela/explainer:${{ steps.meta.outputs.tag }} \
+            --tag ${{ secrets.ACR_LOGIN_SERVER }}/centinela/explainer:latest \
+            --file explainer/Dockerfile \
+            explainer/
+          rm explainer/db.py explainer/models.py
+
+      - name: Push imagen explainer
+        run: |
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/centinela/explainer:${{ steps.meta.outputs.tag }}
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/centinela/explainer:latest
+
+  # ==============================================================================
+  # JOB 3: Despliegue a Azure
+  # Actualiza la imagen activa en App Service y las Azure Functions.
+  # ==============================================================================
+  deploy:
+    name: "🚀 Despliegue a Azure"
+    runs-on: ubuntu-latest
+    needs: build-and-publish
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    environment:
+      name: production
+      url: https://${{ vars.APP_SERVICE_NAME }}.azurewebsites.net
+
+    steps:
+      - name: Autenticar con Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Construir la URL completa de la imagen con el SHA del commit
+      - name: Calcular etiqueta de imagen
+        id: meta
+        run: echo "tag=$(echo ${{ github.sha }} | cut -c1-8)" >> $GITHUB_OUTPUT
+
+      # --- Desplegar API -------------------------------------------------------
+      - name: Desplegar imagen API en App Service
+        run: |
+          az webapp config container set \
+            --resource-group ${{ vars.RESOURCE_GROUP }} \
+            --name ${{ vars.APP_SERVICE_NAME }} \
+            --container-image-name ${{ secrets.ACR_LOGIN_SERVER }}/centinela/api:${{ steps.meta.outputs.tag }} \
+            --output none
+
+          # Forzar reinicio para que tome la imagen nueva
+          az webapp restart \
+            --resource-group ${{ vars.RESOURCE_GROUP }} \
+            --name ${{ vars.APP_SERVICE_NAME }} \
+            --output none
+
+      # --- Desplegar Function de scoring ---------------------------------------
+      - name: Desplegar imagen scoring en Azure Functions
+        run: |
+          az functionapp config container set \
+            --resource-group ${{ vars.RESOURCE_GROUP }} \
+            --name ${{ vars.SCORING_FUNCTION_NAME }} \
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/centinela/scoring:${{ steps.meta.outputs.tag }} \
+            --output none
+
+          az functionapp restart \
+            --resource-group ${{ vars.RESOURCE_GROUP }} \
+            --name ${{ vars.SCORING_FUNCTION_NAME }} \
+            --output none
+
+      # --- Desplegar Function de casos ----------------------------------------
+      - name: Desplegar imagen cases en Azure Functions
+        run: |
+          az functionapp config container set \
+            --resource-group ${{ vars.RESOURCE_GROUP }} \
+            --name ${{ vars.CASES_FUNCTION_NAME }} \
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/centinela/cases:${{ steps.meta.outputs.tag }} \
+            --output none
+
+          az functionapp restart \
+            --resource-group ${{ vars.RESOURCE_GROUP }} \
+            --name ${{ vars.CASES_FUNCTION_NAME }} \
+            --output none
+
+      # --- Desplegar Function del explicador ----------------------------------
+      - name: Desplegar imagen explainer en Azure Functions
+        run: |
+          az functionapp config container set \
+            --resource-group ${{ vars.RESOURCE_GROUP }} \
+            --name ${{ vars.EXPLAINER_FUNCTION_NAME }} \
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/centinela/explainer:${{ steps.meta.outputs.tag }} \
+            --output none
+
+          az functionapp restart \
+            --resource-group ${{ vars.RESOURCE_GROUP }} \
+            --name ${{ vars.EXPLAINER_FUNCTION_NAME }} \
+            --output none
+
+      # Verificación básica de salud post-despliegue
+      - name: Verificar health check de la API
+        run: |
+          sleep 30  # Dar tiempo al App Service para reiniciar
+          curl --fail --silent \
+            https://${{ vars.APP_SERVICE_NAME }}.azurewebsites.net/health \
+            | jq '.status'

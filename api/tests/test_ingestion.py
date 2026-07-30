@@ -1,5 +1,19 @@
 import uuid
 from datetime import datetime, timedelta, timezone
+from typing import Any
+
+from app.main import app
+from app.messaging.publisher import get_event_publisher
+
+
+class SpyEventPublisher:
+    """Doble de prueba: captura los eventos publicados en vez de enviarlos a Azure."""
+
+    def __init__(self) -> None:
+        self.published: list[tuple[str, dict[str, Any]]] = []
+
+    async def publish(self, event_type: str, payload: dict[str, Any]) -> None:
+        self.published.append((event_type, payload))
 
 
 def _valid_payload(**overrides):
@@ -109,3 +123,37 @@ def test_persisted_transaction_is_retrievable_by_id(client):
 def test_unknown_transaction_id_returns_404(client):
     response = client.get(f"/transactions/{uuid.uuid4()}")
     assert response.status_code == 404
+
+
+def test_published_event_carries_full_transaction_not_just_id(client):
+    spy = SpyEventPublisher()
+    app.dependency_overrides[get_event_publisher] = lambda: spy
+    try:
+        payload = _valid_payload()
+        client.post("/transactions", json=payload)
+    finally:
+        del app.dependency_overrides[get_event_publisher]
+
+    assert len(spy.published) == 1
+    event_type, event_payload = spy.published[0]
+    assert event_type == "transaction.received"
+    assert event_payload["transaction_id"] == payload["transaction_id"]
+    assert event_payload["account_id"] == payload["account_id"]
+    assert event_payload["amount_minor_units"] == payload["amount_minor_units"]
+    assert event_payload["currency"] == payload["currency"]
+    assert event_payload["location"] == payload["location"]
+    assert event_payload["merchant"] == payload["merchant"]
+    assert "server_received_at" in event_payload  # generado por el servidor, no client_timestamp
+
+
+def test_duplicate_transaction_does_not_republish_event(client):
+    spy = SpyEventPublisher()
+    app.dependency_overrides[get_event_publisher] = lambda: spy
+    try:
+        payload = _valid_payload()
+        client.post("/transactions", json=payload)
+        client.post("/transactions", json=payload)
+    finally:
+        del app.dependency_overrides[get_event_publisher]
+
+    assert len(spy.published) == 1

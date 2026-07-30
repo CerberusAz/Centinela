@@ -1,10 +1,17 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from azure.core.exceptions import ResourceNotFoundError
 from azure.identity.aio import DefaultAzureCredential
+from azure.storage.blob import BlobSasPermissions, generate_blob_sas
 from azure.storage.blob.aio import BlobServiceClient
+
+# Vigencia por defecto del acceso temporal y delegado que se concede a un
+# analista sobre un documento específico (sección 2.10). 30 minutos es
+# suficiente para revisar un documento durante el análisis de un caso sin
+# dejar una URL válida indefinidamente.
+DEFAULT_SAS_EXPIRY_MINUTES = 30
 
 
 # Tipos de archivo aceptados para documentos de verificación de identidad.
@@ -143,6 +150,61 @@ class BlobDocumentStorage:
             "content_type": ext,
             "size_bytes": len(file_bytes),
             "uploaded_at": uploaded_at.isoformat(),
+        }
+
+    async def generate_read_sas_url(
+        self, blob_name: str, expiry_minutes: int = DEFAULT_SAS_EXPIRY_MINUTES
+    ) -> dict[str, str]:
+        """
+        Genera una URL de lectura temporal y delegada sobre un blob
+        específico del contenedor de documentos de identidad (sección 2.10:
+        "El acceso de los analistas se resuelve mediante un mecanismo de
+        acceso temporal y delegado. No se admite exponer el contenedor
+        públicamente.").
+
+        Usa un **User Delegation Key** (`get_user_delegation_key`), obtenido
+        con la misma identidad gestionada que el resto del componente — no
+        una clave de cuenta ni un connection string. La firma del SAS la
+        emite Microsoft Entra ID a través de esa clave de delegación, nunca
+        un secreto administrado por la célula (requerimiento 2.6/2.10).
+
+        El SAS resultante está acotado a:
+        - un único blob (no todo el contenedor),
+        - permiso de solo lectura,
+        - una ventana de vigencia corta (`expiry_minutes`).
+
+        Returns:
+            Diccionario con { url, expires_at }.
+
+        Raises:
+            ResourceNotFoundError: si el blob no existe en el contenedor.
+        """
+        blob_client = self._client.get_blob_client(
+            container=self._container_name, blob=blob_name
+        )
+        if not await blob_client.exists():
+            raise ResourceNotFoundError(f"El documento '{blob_name}' no existe.")
+
+        now = datetime.now(timezone.utc)
+        expiry = now + timedelta(minutes=expiry_minutes)
+
+        delegation_key = await self._client.get_user_delegation_key(
+            key_start_time=now, key_expiry_time=expiry
+        )
+
+        sas_token = generate_blob_sas(
+            account_name=self._client.account_name,
+            container_name=self._container_name,
+            blob_name=blob_name,
+            user_delegation_key=delegation_key,
+            permission=BlobSasPermissions(read=True),
+            expiry=expiry,
+            start=now,
+        )
+
+        return {
+            "url": f"{blob_client.url}?{sas_token}",
+            "expires_at": expiry.isoformat(),
         }
 
     async def close(self) -> None:

@@ -12,10 +12,11 @@ from app.models.transaction import TransactionIn
 class BlobTransactionStorage:
     """
     Persiste cada transacción cruda como un blob JSON individual, usando
-    transaction_id como nombre de blob dentro del contenedor
-    `raw-transactions` (distinto del contenedor de documentos de
-    verificación de identidad de la sección 2.10, que es responsabilidad
-    de infraestructura de red/almacenamiento, no de este componente).
+    transaction_id como nombre de blob dentro del contenedor configurado
+    en `CENTINELA_BLOB_CONTAINER_RAW_TRANSACTIONS` (default: `transacciones`,
+    distinto del contenedor de documentos de verificación de identidad de
+    la sección 2.10, que es responsabilidad de infraestructura de red/
+    almacenamiento, no de este componente).
 
     Autenticación exclusivamente vía identidad gestionada
     (DefaultAzureCredential resuelve la Managed Identity del App Service en
