@@ -110,7 +110,34 @@ module eventing 'modules/eventing.bicep' = {
   }
 }
 
-// 8. App Service (Web App y Plan) -- API de ingesta
+// 8. Azure Container Registry (semana 3: registro privado de imágenes)
+module registry 'modules/registry.bicep' = {
+  name: 'deploy-registry'
+  scope: rg
+  params: {
+    prefix: prefix
+    env: env
+    instance: instance
+    regionShort: regionShort
+    location: location
+  }
+}
+
+// 9. Observabilidad: Application Insights + Log Analytics + Alerta (semana 3)
+module monitoring 'modules/monitoring.bicep' = {
+  name: 'deploy-monitoring'
+  scope: rg
+  params: {
+    prefix: prefix
+    env: env
+    instance: instance
+    regionShort: regionShort
+    location: location
+    alertEmail: alertEmail
+  }
+}
+
+// 10. App Service (Web App y Plan) -- API de ingesta
 module app 'modules/app.bicep' = {
   name: 'deploy-app'
   scope: rg
@@ -125,10 +152,12 @@ module app 'modules/app.bicep' = {
     appServiceSku: appServiceSku
     cosmosAccountUrl: cosmos.outputs.documentEndpoint
     eventGridTopicEndpoint: eventing.outputs.eventGridTopicEndpoint
+    appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
+    acrLoginServer: registry.outputs.acrLoginServer
   }
 }
 
-// 9. Functions (semana 2: motor de scoring + creación de casos)
+// 11. Functions (semana 2: motor de scoring + creación de casos)
 module functions 'modules/functions.bicep' = {
   name: 'deploy-functions'
   scope: rg
@@ -139,7 +168,6 @@ module functions 'modules/functions.bicep' = {
     regionShort: regionShort
     location: location
     subnetScoringId: network.outputs.subnetScoringId
-    eventGridTopicName: eventing.outputs.eventGridTopicName
     cosmosAccountUrl: cosmos.outputs.documentEndpoint
     cosmosDatabaseName: 'centinela'
     cosmosContainerTransactions: 'transactions'
@@ -147,10 +175,12 @@ module functions 'modules/functions.bicep' = {
     casosQueueName: eventing.outputs.casosQueueName
     sqlServerFqdn: sql.outputs.serverFqdn
     sqlDatabaseName: sql.outputs.databaseName
+    appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
+    acrLoginServer: registry.outputs.acrLoginServer
   }
 }
 
-// 10. Asignaciones de Rol (RBAC) -- Web App + ambas Functions
+// 12. Asignaciones de Rol (RBAC) -- Web App + ambas Functions + ACR
 module rbac 'modules/rbac.bicep' = {
   name: 'deploy-rbac'
   scope: rg
@@ -162,7 +192,9 @@ module rbac 'modules/rbac.bicep' = {
     serviceBusNamespaceName: eventing.outputs.serviceBusNamespaceName
     scoringFunctionPrincipalId: functions.outputs.scoringFunctionPrincipalId
     casesFunctionPrincipalId: functions.outputs.casesFunctionPrincipalId
+    explainerFunctionPrincipalId: functions.outputs.explainerFunctionPrincipalId
     functionsStorageAccountName: functions.outputs.functionsStorageAccountName
+    acrName: registry.outputs.acrName
   }
 }
 
@@ -172,3 +204,6 @@ output scoringFunctionAppName string = functions.outputs.scoringFunctionAppName
 output casesFunctionAppName string = functions.outputs.casesFunctionAppName
 output cosmosAccountName string = cosmos.outputs.accountName
 output sqlServerFqdn string = sql.outputs.serverFqdn
+output acrLoginServer string = registry.outputs.acrLoginServer
+output acrName string = registry.outputs.acrName
+output appInsightsName string = monitoring.outputs.appInsightsName

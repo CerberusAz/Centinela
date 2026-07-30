@@ -17,7 +17,6 @@ param instance string
 param regionShort string
 param location string = resourceGroup().location
 param subnetScoringId string
-param eventGridTopicName string
 param cosmosAccountUrl string
 param cosmosDatabaseName string
 param cosmosContainerTransactions string
@@ -25,6 +24,8 @@ param serviceBusNamespaceFqdn string
 param casosQueueName string
 param sqlServerFqdn string
 param sqlDatabaseName string
+param appInsightsConnectionString string  // Semana 3
+param acrLoginServer string               // Semana 3
 
 var functionsStorageAccountName = take(
   'stfn${prefix}${env}${regionShort}${instance}${uniqueString(resourceGroup().id)}', 24
@@ -33,6 +34,7 @@ var scoringPlanName = 'plan-scoring-${prefix}-${env}-${regionShort}-${instance}'
 var scoringFunctionAppName = 'func-scoring-${prefix}-${env}-${regionShort}-${instance}'
 var casesPlanName = 'plan-cases-${prefix}-${env}-${regionShort}-${instance}'
 var casesFunctionAppName = 'func-cases-${prefix}-${env}-${regionShort}-${instance}'
+var explainerFunctionAppName = 'func-explainer-${prefix}-${env}-${regionShort}-${instance}'
 
 // Storage propia para el runtime de las Functions (AzureWebJobsStorage) --
 // separada de la cuenta de storage.bicep para no mezclar el ciclo de vida
@@ -75,19 +77,20 @@ resource scoringFunctionApp 'Microsoft.Web/sites@2022-09-01' = {
     serverFarmId: scoringPlan.id
     virtualNetworkSubnetId: subnetScoringId
     siteConfig: {
-      linuxFxVersion: 'PYTHON|3.11'
+      linuxFxVersion: 'DOCKER|mcr.microsoft.com/azure-functions/python:4-python3.11'
       appSettings: [
         // AzureWebJobsStorage por identidad gestionada, sin clave de
         // cuenta -- requiere los roles de datos asignados en rbac.bicep.
         { name: 'AzureWebJobsStorage__accountName', value: functionsStorage.name }
         { name: 'FUNCTIONS_EXTENSION_VERSION', value: '~4' }
         { name: 'FUNCTIONS_WORKER_RUNTIME', value: 'python' }
-        { name: 'SCM_DO_BUILD_DURING_DEPLOYMENT', value: 'true' }
         { name: 'CENTINELA_SCORING_COSMOS_ACCOUNT_URL', value: cosmosAccountUrl }
         { name: 'CENTINELA_SCORING_COSMOS_DATABASE_NAME', value: cosmosDatabaseName }
         { name: 'CENTINELA_SCORING_COSMOS_CONTAINER_TRANSACTIONS', value: cosmosContainerTransactions }
         { name: 'CENTINELA_SCORING_SERVICEBUS_NAMESPACE_FQDN', value: serviceBusNamespaceFqdn }
         { name: 'CENTINELA_SCORING_SERVICEBUS_QUEUE_CASOS', value: casosQueueName }
+        { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
+        { name: 'DOCKER_REGISTRY_SERVER_URL', value: 'https://${acrLoginServer}' }
       ]
     }
   }
@@ -117,17 +120,45 @@ resource casesFunctionApp 'Microsoft.Web/sites@2022-09-01' = {
     serverFarmId: casesPlan.id
     virtualNetworkSubnetId: subnetScoringId
     siteConfig: {
-      linuxFxVersion: 'PYTHON|3.11'
+      linuxFxVersion: 'DOCKER|mcr.microsoft.com/azure-functions/python:4-python3.11'
       appSettings: [
         { name: 'AzureWebJobsStorage__accountName', value: functionsStorage.name }
         { name: 'FUNCTIONS_EXTENSION_VERSION', value: '~4' }
         { name: 'FUNCTIONS_WORKER_RUNTIME', value: 'python' }
-        { name: 'SCM_DO_BUILD_DURING_DEPLOYMENT', value: 'true' }
         // Binding del trigger de Service Bus por identidad gestionada
         // (convención Azure Functions: <NombreConexion>__fullyQualifiedNamespace).
         { name: 'ServiceBusConnection__fullyQualifiedNamespace', value: serviceBusNamespaceFqdn }
         { name: 'CENTINELA_CASES_SQL_SERVER', value: sqlServerFqdn }
         { name: 'CENTINELA_CASES_SQL_DATABASE', value: sqlDatabaseName }
+        { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
+        { name: 'DOCKER_REGISTRY_SERVER_URL', value: 'https://${acrLoginServer}' }
+      ]
+    }
+  }
+}
+
+// El explicador de casos comparte el Plan B1 de la Function de Casos
+resource explainerFunctionApp 'Microsoft.Web/sites@2022-09-01' = {
+  name: explainerFunctionAppName
+  location: location
+  kind: 'functionapp,linux'
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    serverFarmId: casesPlan.id  // Comparte el plan B1
+    virtualNetworkSubnetId: subnetScoringId
+    siteConfig: {
+      linuxFxVersion: 'DOCKER|mcr.microsoft.com/azure-functions/python:4-python3.11'
+      appSettings: [
+        { name: 'AzureWebJobsStorage__accountName', value: functionsStorage.name }
+        { name: 'FUNCTIONS_EXTENSION_VERSION', value: '~4' }
+        { name: 'FUNCTIONS_WORKER_RUNTIME', value: 'python' }
+        { name: 'ServiceBusConnection__fullyQualifiedNamespace', value: serviceBusNamespaceFqdn }
+        { name: 'CENTINELA_EXPLAINER_SQL_SERVER', value: sqlServerFqdn }
+        { name: 'CENTINELA_EXPLAINER_SQL_DATABASE', value: sqlDatabaseName }
+        { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
+        { name: 'DOCKER_REGISTRY_SERVER_URL', value: 'https://${acrLoginServer}' }
       ]
     }
   }
@@ -139,4 +170,6 @@ output scoringFunctionAppName string = scoringFunctionApp.name
 output scoringFunctionPrincipalId string = scoringFunctionApp.identity.principalId
 output casesFunctionAppName string = casesFunctionApp.name
 output casesFunctionPrincipalId string = casesFunctionApp.identity.principalId
+output explainerFunctionAppName string = explainerFunctionApp.name
+output explainerFunctionPrincipalId string = explainerFunctionApp.identity.principalId
 output functionsStorageAccountName string = functionsStorage.name
