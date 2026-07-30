@@ -1,2 +1,2 @@
-Usado como mensaje de trigger para CI/CD de Github Actions
+Usado como mensaje de trigger para CI/CD de Github Actions.
 
