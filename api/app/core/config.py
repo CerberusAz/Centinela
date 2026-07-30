@@ -7,10 +7,17 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class StorageBackend(str, Enum):
     MEMORY = "memory"
     BLOB = "blob"
+    # Semana 2: escribe a Blob (autoridad de idempotencia/lookup) y además a
+    # Cosmos DB (store operativo del motor de scoring). Ver
+    # app/storage/dual_storage.py.
+    DUAL = "dual"
 
 
 class EventPublisherBackend(str, Enum):
     NOOP = "noop"
+    # Semana 2: distribución del evento de transacción (Azure-Semana2.md
+    # 2.4). Ver app/messaging/event_grid_publisher.py.
+    EVENT_GRID = "eventgrid"
 
 
 class Settings(BaseSettings):
@@ -26,7 +33,7 @@ class Settings(BaseSettings):
 
     storage_backend: StorageBackend = StorageBackend.MEMORY
     blob_account_url: str | None = None
-    blob_container_raw_transactions: str = "raw-transactions"
+    blob_container_raw_transactions: str = "transacciones"
 
     # Contenedor de documentos de verificación de identidad (sección 2.10).
     # El nombre del blob lo genera el sistema, nunca el usuario.
@@ -38,6 +45,16 @@ class Settings(BaseSettings):
 
     event_publisher_backend: EventPublisherBackend = EventPublisherBackend.NOOP
 
+    # Semana 2 — store operativo de Cosmos DB (obligatorio si
+    # storage_backend=dual). Ver docs/justificacion-particionamiento-cosmos.md.
+    cosmos_account_url: str | None = None
+    cosmos_database_name: str = "centinela"
+    cosmos_container_transactions: str = "transactions"
+
+    # Semana 2 — topic de Event Grid (obligatorio si
+    # event_publisher_backend=eventgrid).
+    event_grid_topic_endpoint: str | None = None
+
     # Monto máximo aceptado, en unidad monetaria menor (ver docs/contrato-transaccion.md).
     # Valor por defecto conservador para un sistema de detección de fraude minorista;
     # ajustar por configuración según el perfil real de transacciones de Centinela.
@@ -45,6 +62,12 @@ class Settings(BaseSettings):
 
     # Tolerancia de reloj para rechazar client_timestamp futuro (sección 2.9).
     clock_skew_tolerance_seconds: int = 60
+
+    # Limitación de tasa de POST /transactions (Azure-Semana2.md, sección
+    # 2.7). Justificación de los valores por defecto en
+    # docs/limite-tasa-api.md. Ventana deslizante por IP de origen.
+    rate_limit_window_seconds: int = 60
+    rate_limit_max_requests: int = 60
 
 
 @lru_cache

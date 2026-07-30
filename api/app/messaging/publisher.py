@@ -3,6 +3,7 @@ from typing import Any, Protocol
 from fastapi import Depends
 
 from app.core.config import EventPublisherBackend, Settings, get_settings
+from app.messaging.event_grid_publisher import EventGridEventPublisher
 
 
 class EventPublisher(Protocol):
@@ -31,6 +32,15 @@ def get_event_publisher(settings: Settings = Depends(get_settings)) -> EventPubl
     if _publisher_instance is None:
         if settings.event_publisher_backend == EventPublisherBackend.NOOP:
             _publisher_instance = NoOpEventPublisher()
+        elif settings.event_publisher_backend == EventPublisherBackend.EVENT_GRID:
+            if not settings.event_grid_topic_endpoint:
+                raise RuntimeError(
+                    "CENTINELA_EVENT_GRID_TOPIC_ENDPOINT es obligatorio cuando "
+                    "CENTINELA_EVENT_PUBLISHER_BACKEND=eventgrid"
+                )
+            _publisher_instance = EventGridEventPublisher(
+                topic_endpoint=settings.event_grid_topic_endpoint
+            )
         else:
             raise RuntimeError(f"Publisher no soportado: {settings.event_publisher_backend}")
     return _publisher_instance

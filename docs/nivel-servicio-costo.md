@@ -76,3 +76,26 @@ existencia del plan** — a diferencia de un plan Consumption/serverless, un
 B1 corre y cobra aunque no reciba tráfico. Esto hace que el script de
 apagado (entregable 5) sea la única palanca real de ahorro para este
 componente, y no la ausencia de tráfico.
+
+## 4. Azure Functions — plan Basic B1 (semana 2)
+
+El diseño original de semana 2 prevé Functions en plan Consumption (Y1),
+billado por ejecución y con escala a cero. Sin embargo, el aislamiento de
+red exigido por semana 2 (subred `snet-scoring` vía Service Endpoint)
+requiere como mínimo un plan Basic — el plan Consumption no soporta
+VNet Integration (confirmado con el error `SKU '' does not support Virtual
+Network Integration` durante el despliegue real; ver ADR-022b en
+`docs/decisiones-arquitectura.md`).
+
+Se migraron los planes de las dos Azure Functions (`plan-scoring-*` y
+`plan-cases-*`) a **Basic B1**, mismo nivel que el App Service de la API:
+
+| Plan | Componente | Billing |
+|---|---|---|
+| `plan-trial-dev-cus-003` (B1) | API (`app-trial-dev-cus-003`) | Por hora de existencia |
+| `plan-scoring-trial-dev-cus-003` (B1) | Motor de scoring (`func-scoring-*`) | Por hora de existencia |
+| `plan-cases-trial-dev-cus-003` (B1) | Gestión de casos (`func-cases-*`) | Por hora de existencia |
+
+**Consecuencia de costo:** el entorno de semana 2 tiene 3 planes B1
+activos simultáneamente. Apagar el grupo de recursos al cierre de cada
+jornada sigue siendo la única palanca real de ahorro.

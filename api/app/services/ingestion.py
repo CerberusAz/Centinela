@@ -68,9 +68,27 @@ class IngestionService:
         # "transaction.received" para el motor de scoring asíncrono. El
         # publisher real reemplaza a NoOpEventPublisher por configuración
         # (CENTINELA_EVENT_PUBLISHER_BACKEND); esta línea no cambia.
+        #
+        # El payload lleva la transacción completa, no solo el id: con
+        # consistencia Session en Cosmos DB, la API y el motor de scoring
+        # son procesos con clientes distintos, sin garantía automática de
+        # que la Function vea el registro que la API acaba de escribir. Al
+        # viajar la transacción completa en el evento, el motor nunca
+        # depende de releer Cosmos para SU PROPIA transacción — solo
+        # consulta Cosmos para el historial de transacciones ANTERIORES de
+        # la cuenta, donde una leve staleness sí es aceptable (ver
+        # docs/decisiones-arquitectura.md).
         await self._publisher.publish(
             event_type="transaction.received",
-            payload={"transaction_id": transaction.transaction_id},
+            payload={
+                "transaction_id": transaction.transaction_id,
+                "account_id": transaction.account_id,
+                "amount_minor_units": transaction.amount_minor_units,
+                "currency": transaction.currency,
+                "server_received_at": server_received_at.isoformat(),
+                "location": transaction.location.model_dump(),
+                "merchant": transaction.merchant.model_dump(),
+            },
         )
         # ---------------------------------------------------------------------
 

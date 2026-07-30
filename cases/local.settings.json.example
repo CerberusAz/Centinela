@@ -1,0 +1,10 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "AzureWebJobsStorage": "",
+    "ServiceBusConnection__fullyQualifiedNamespace": "sb-trial-dev-weu-003.servicebus.windows.net",
+    "CENTINELA_CASES_SQL_SERVER": "sql-trial-dev-weu-003.database.windows.net",
+    "CENTINELA_CASES_SQL_DATABASE": "centinela-casos"
+  }
+}
