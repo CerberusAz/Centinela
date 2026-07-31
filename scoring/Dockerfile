@@ -58,7 +58,7 @@ RUN sed 's/#.*//' requirements.txt \
         | grep -v "^azure-functions" \
         | grep -v '^[[:space:]]*$' \
         > /tmp/req-install.txt \
-    && pip install --no-cache-dir --no-index --find-links=/wheels -r /tmp/req-install.txt \
+    && pip install --no-cache-dir --find-links=/wheels -r /tmp/req-install.txt \
     && rm -rf /wheels /tmp/req-install.txt
 
 # Copiar código fuente del motor de scoring
