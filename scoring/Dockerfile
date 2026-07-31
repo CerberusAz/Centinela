@@ -27,7 +27,10 @@ COPY requirements.txt .
 # Excluir azure-functions del build de wheels: la imagen base de Functions ya
 # lo incluye; incluirlo duplicaría la capa y podría generar conflictos de versión.
 RUN pip install --upgrade pip \
-    && grep -v "^azure-functions" requirements.txt > requirements-no-func.txt \
+    && sed 's/#.*//' requirements.txt \
+       | grep -v "^azure-functions" \
+       | grep -v '^[[:space:]]*$' \
+       > requirements-no-func.txt \
     && pip wheel --no-cache-dir --wheel-dir /wheels -r requirements-no-func.txt
 
 
@@ -52,7 +55,9 @@ WORKDIR /home/site/wwwroot
 COPY --from=builder /wheels /wheels
 COPY requirements.txt .
 RUN pip install --no-cache-dir --no-index --find-links=/wheels \
-        $(grep -v "^azure-functions" requirements.txt | tr '\n' ' ') \
+        -r <(sed 's/#.*//' requirements.txt \
+             | grep -v "^azure-functions" \
+             | grep -v '^[[:space:]]*$') \
     && rm -rf /wheels
 
 # Copiar código fuente del motor de scoring

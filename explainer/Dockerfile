@@ -43,7 +43,10 @@ WORKDIR /home/site/wwwroot
 COPY --from=builder /wheels /wheels
 COPY requirements.txt .
 RUN pip install --no-cache-dir --no-index --find-links=/wheels \
-        $(grep -v "^azure-functions" requirements.txt | grep -v "^pyodbc" | tr '\n' ' ') \
+        -r <(sed 's/#.*//' requirements.txt \
+             | grep -v "^azure-functions" \
+             | grep -v "^pyodbc" \
+             | grep -v '^[[:space:]]*$') \
     && pip install --no-cache-dir pyodbc \
     && rm -rf /wheels
 
