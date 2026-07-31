@@ -60,5 +60,4 @@ EXPOSE 8000
 
 # Gunicorn con worker Uvicorn: mismo comando configurado en app.bicep
 # (appCommandLine) para consistencia entre despliegue zip y contenedor.
-CMD ["gunicorn", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", \
-     "--bind", "0.0.0.0:8000", "app.main:app"]
+CMD ["gunicorn", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "app.main:app"]
