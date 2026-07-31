@@ -48,10 +48,6 @@ RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.t
 # Copiar el código fuente de la aplicación
 COPY app/ ./app/
 
-# Crear usuario no-root para ejecutar la aplicación
-RUN adduser --disabled-password --gecos "" appuser \
-    && chown -R appuser:appuser /app
-USER appuser
 
 # Variables de entorno que configuran el comportamiento del servidor.
 # Los valores sensibles (connection strings, URLs de Azure) llegan en tiempo
