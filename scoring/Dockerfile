@@ -54,11 +54,12 @@ WORKDIR /home/site/wwwroot
 # Instalar dependencias precompiladas desde el stage builder
 COPY --from=builder /wheels /wheels
 COPY requirements.txt .
-RUN pip install --no-cache-dir --no-index --find-links=/wheels \
-        -r <(sed 's/#.*//' requirements.txt \
-             | grep -v "^azure-functions" \
-             | grep -v '^[[:space:]]*$') \
-    && rm -rf /wheels
+RUN sed 's/#.*//' requirements.txt \
+        | grep -v "^azure-functions" \
+        | grep -v '^[[:space:]]*$' \
+        > /tmp/req-install.txt \
+    && pip install --no-cache-dir --no-index --find-links=/wheels -r /tmp/req-install.txt \
+    && rm -rf /wheels /tmp/req-install.txt
 
 # Copiar código fuente del motor de scoring
 # El host de Functions descubre las funciones a partir de function_app.py

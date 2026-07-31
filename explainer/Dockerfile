@@ -42,13 +42,14 @@ WORKDIR /home/site/wwwroot
 
 COPY --from=builder /wheels /wheels
 COPY requirements.txt .
-RUN pip install --no-cache-dir --no-index --find-links=/wheels \
-        -r <(sed 's/#.*//' requirements.txt \
-             | grep -v "^azure-functions" \
-             | grep -v "^pyodbc" \
-             | grep -v '^[[:space:]]*$') \
+RUN sed 's/#.*//' requirements.txt \
+        | grep -v "^azure-functions" \
+        | grep -v "^pyodbc" \
+        | grep -v '^[[:space:]]*$' \
+        > /tmp/req-install.txt \
+    && pip install --no-cache-dir --no-index --find-links=/wheels -r /tmp/req-install.txt \
     && pip install --no-cache-dir pyodbc \
-    && rm -rf /wheels
+    && rm -rf /wheels /tmp/req-install.txt
 
 # Copiar el modelo compartido (en CI/CD esto se podría resolver con un paquete común,
 # pero para mantener el mono-repo simple, asumimos que models.py se copia aquí).
